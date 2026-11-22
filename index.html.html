@@ -1,0 +1,1547 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Зал Славы: Ачивки Льва</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & Space Grotesk -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
+  <!-- Three.js r128 & OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['Space Grotesk', 'Inter', 'sans-serif'],
+          },
+          colors: {
+            space: '#060811',
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #060811;
+      color: #f8fafc;
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* Glassmorphism panels */
+    .glass {
+      background: rgba(13, 18, 34, 0.68);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .glass-strong {
+      background: rgba(10, 14, 28, 0.88);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(6, 8, 17, 0.8);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.3);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.55);
+    }
+
+    /* 3D Canvas Container */
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      touch-action: none;
+    }
+
+    /* Floating 3D Tooltip */
+    #tooltip-3d {
+      position: fixed;
+      pointer-events: none;
+      z-index: 40;
+      opacity: 0;
+      transform: translate(-50%, -125%) scale(0.95);
+      transition: opacity 0.16s ease, transform 0.16s ease;
+    }
+    #tooltip-3d.visible {
+      opacity: 1;
+      transform: translate(-50%, -135%) scale(1);
+    }
+
+    /* 3D Tilt Card in Grid View */
+    .tilt-card {
+      transform-style: preserve-3d;
+      transition: transform 0.18s ease-out, box-shadow 0.25s ease, border-color 0.25s ease;
+      will-change: transform;
+    }
+
+    /* Staggered card entrance animation */
+    @keyframes fadeSlideUp {
+      from {
+        opacity: 0;
+        transform: translateY(18px) scale(0.97);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .card-enter {
+      animation: fadeSlideUp 0.42s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      opacity: 0;
+    }
+
+    /* Holographic shimmer on Legendary cards */
+    @keyframes holoShimmer {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .rarity-legendary-glow {
+      box-shadow: 0 0 24px -4px rgba(250, 204, 21, 0.35), inset 0 0 18px -6px rgba(250, 204, 21, 0.2);
+    }
+    .rarity-epic-glow {
+      box-shadow: 0 0 20px -4px rgba(168, 85, 247, 0.32), inset 0 0 14px -6px rgba(168, 85, 247, 0.18);
+    }
+    .rarity-rare-glow {
+      box-shadow: 0 0 18px -4px rgba(56, 189, 248, 0.28), inset 0 0 12px -6px rgba(56, 189, 248, 0.14);
+    }
+
+    /* Modal transitions */
+    .modal-backdrop {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.22s ease;
+    }
+    .modal-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .modal-panel {
+      transform: scale(0.94) translateY(12px);
+      transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .modal-backdrop.open .modal-panel {
+      transform: scale(1) translateY(0);
+    }
+
+    /* Toast notification */
+    #toast {
+      transform: translateY(100px);
+      opacity: 0;
+      transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s ease;
+    }
+    #toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body class="bg-space text-slate-100 antialiased selection:bg-sky-500/30 selection:text-sky-200">
+
+  <!-- 3D Constellation Canvas -->
+  <div id="canvas-container"></div>
+
+  <!-- 3D Hover Tooltip -->
+  <div id="tooltip-3d" class="glass-strong rounded-xl px-3.5 py-2 shadow-2xl max-w-xs border border-white/15">
+    <div class="flex items-center gap-2.5">
+      <span id="tooltip-emoji" class="text-xl leading-none"></span>
+      <div class="min-w-0">
+        <div id="tooltip-title" class="text-sm font-semibold text-white truncate"></div>
+        <div id="tooltip-meta" class="text-[11px] font-medium text-slate-300 flex items-center gap-1.5 mt-0.5"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Navigation & Controls Overlay -->
+  <header class="fixed top-0 left-0 right-0 z-30 pointer-events-none p-3 sm:p-4">
+    <div class="max-w-7xl mx-auto flex flex-col gap-2.5">
+      <!-- Primary Bar -->
+      <div class="glass rounded-2xl px-3.5 py-2.5 sm:px-5 sm:py-3 flex flex-wrap items-center justify-between gap-3 pointer-events-auto shadow-2xl">
+        <!-- Brand & Stats -->
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/30 via-purple-500/30 to-rose-500/30 border border-white/15 flex items-center justify-center text-xl shadow-inner">
+            🏆
+          </div>
+          <div>
+            <h1 class="font-display font-bold text-base sm:text-lg tracking-tight text-white leading-tight">
+              Зал Славы: <span class="bg-gradient-to-r from-sky-400 via-purple-400 to-rose-400 bg-clip-text text-transparent">Ачивки Льва</span>
+            </h1>
+            <div class="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+              <span>Всего: <strong id="stat-total" class="text-slate-200">0</strong></span>
+              <span class="text-slate-600">•</span>
+              <span>Показано: <strong id="stat-visible" class="text-sky-400">0</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- View Mode Switcher -->
+        <div class="flex items-center bg-slate-900/80 p-1 rounded-xl border border-white/10">
+          <button id="btn-view-3d" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all flex items-center gap-1.5 bg-sky-500/20 text-sky-300 border border-sky-400/30 shadow-sm">
+            <span>🌌</span>
+            <span>3D Созвездие</span>
+          </button>
+          <button id="btn-view-grid" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all flex items-center gap-1.5 text-slate-400 hover:text-white border border-transparent">
+            <span>🃏</span>
+            <span>Сетка карточек</span>
+          </button>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+          <button id="btn-add" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-400 hover:to-indigo-400 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-sky-500/25 transition-all active:scale-95 flex items-center gap-1.5">
+            <span>+</span>
+            <span>Добавить</span>
+          </button>
+          <button id="btn-export" title="Экспорт в JSON" class="p-2 sm:px-3 sm:py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs sm:text-sm font-medium transition-all active:scale-95 flex items-center gap-1.5">
+            <span>📤</span>
+            <span class="hidden md:inline">Экспорт</span>
+          </button>
+          <button id="btn-import" title="Импорт из JSON" class="p-2 sm:px-3 sm:py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs sm:text-sm font-medium transition-all active:scale-95 flex items-center gap-1.5">
+            <span>📥</span>
+            <span class="hidden md:inline">Импорт</span>
+          </button>
+          <button id="btn-reset" title="Сбросить к стандартным" class="p-2 rounded-xl bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-500/40 text-slate-300 hover:text-rose-300 text-xs sm:text-sm transition-all active:scale-95">
+            🔄
+          </button>
+        </div>
+      </div>
+
+      <!-- Theme Filter Pills -->
+      <div id="theme-filters" class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 pointer-events-auto no-scrollbar">
+        <!-- Injected dynamically -->
+      </div>
+    </div>
+  </header>
+
+  <!-- 3D Controls Floating Bar (Bottom-Right, only in 3D mode) -->
+  <div id="controls-3d-bar" class="fixed bottom-4 right-4 z-20 flex items-center gap-2">
+    <button id="btn-autorotate" class="glass px-3.5 py-2 rounded-xl text-xs font-medium text-sky-300 border border-sky-400/30 hover:bg-sky-500/15 transition-all flex items-center gap-1.5 shadow-lg">
+      <span>💫</span>
+      <span id="autorotate-label">Автовращение: ВКЛ</span>
+    </button>
+    <button id="btn-reset-cam" class="glass px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-all shadow-lg" title="Сбросить камеру">
+      🎯 Центр
+    </button>
+  </div>
+
+  <!-- 3D Hint (Bottom-Left, only in 3D mode) -->
+  <div id="hint-3d" class="fixed bottom-4 left-4 z-20 hidden sm:flex items-center gap-2 glass px-3.5 py-2 rounded-xl text-xs text-slate-400 pointer-events-none">
+    <span>🖱️ Вращай мышью • Колёсико — зум • Клик по карточке — детали</span>
+  </div>
+
+  <!-- Grid View Container (Hidden by default) -->
+  <main id="grid-view" class="relative z-10 hidden min-h-screen pt-36 sm:pt-36 pb-16 px-3 sm:px-6 max-w-7xl mx-auto">
+    <div id="grid-content" class="space-y-10">
+      <!-- Dynamically populated grouped/filtered achievement cards -->
+    </div>
+  </main>
+
+  <!-- Achievement Detail Modal -->
+  <div id="detail-modal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+    <div class="modal-panel glass-strong w-full max-w-lg rounded-3xl p-6 sm:p-7 shadow-2xl relative overflow-hidden">
+      <!-- Dynamic top glow accent -->
+      <div id="detail-glow" class="absolute -top-20 -right-20 w-56 h-56 rounded-full blur-3xl opacity-30 pointer-events-none"></div>
+
+      <div class="flex items-start justify-between gap-4 relative z-10">
+        <div class="flex items-center gap-3.5">
+          <div id="detail-emoji-box" class="w-16 h-16 rounded-2xl flex items-center justify-center text-4xl bg-white/5 border border-white/15 shadow-inner shrink-0">
+            🏆
+          </div>
+          <div>
+            <div class="flex flex-wrap items-center gap-2 mb-1">
+              <span id="detail-theme-badge" class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full border"></span>
+              <span id="detail-rarity-badge" class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full border"></span>
+            </div>
+            <h2 id="detail-title" class="font-display font-bold text-xl sm:text-2xl text-white leading-snug"></h2>
+          </div>
+        </div>
+        <button id="detail-close" class="p-2 rounded-xl bg-white/5 hover:bg-white/15 text-slate-400 hover:text-white transition-colors">
+          ✕
+        </button>
+      </div>
+
+      <p id="detail-desc" class="mt-5 text-slate-300 text-sm sm:text-base leading-relaxed relative z-10 bg-white/[0.03] rounded-2xl p-4 border border-white/5"></p>
+
+      <div class="mt-6 flex items-center justify-between gap-3 relative z-10 pt-4 border-t border-white/10">
+        <div class="text-xs text-slate-400">
+          Статус: <span class="text-emerald-400 font-medium">● Разблокировано</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="detail-edit" class="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-100 text-xs sm:text-sm font-medium transition-all flex items-center gap-1.5">
+            <span>✏️</span>
+            <span>Изменить</span>
+          </button>
+          <button id="detail-delete" class="px-3.5 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 text-xs sm:text-sm font-medium transition-all flex items-center gap-1.5">
+            <span>🗑️</span>
+            <span>Удалить</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add / Edit Achievement Modal -->
+  <div id="form-modal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+    <div class="modal-panel glass-strong w-full max-w-lg rounded-3xl p-6 sm:p-7 shadow-2xl">
+      <div class="flex items-center justify-between mb-5">
+        <h2 id="form-modal-title" class="font-display font-bold text-xl text-white">Новая ачивка</h2>
+        <button id="form-close" class="p-2 rounded-xl bg-white/5 hover:bg-white/15 text-slate-400 hover:text-white transition-colors">✕</button>
+      </div>
+
+      <form id="achievement-form" class="space-y-4">
+        <input type="hidden" id="field-id" />
+
+        <div class="grid grid-cols-4 gap-3">
+          <div class="col-span-1">
+            <label class="block text-xs font-medium text-slate-300 mb-1.5">Эмодзи</label>
+            <input id="field-emoji" type="text" required maxlength="4" placeholder="🔥" class="w-full px-3 py-2.5 rounded-xl bg-slate-900/90 border border-white/15 text-center text-xl focus:outline-none focus:border-sky-400 transition-colors" />
+          </div>
+          <div class="col-span-3">
+            <label class="block text-xs font-medium text-slate-300 mb-1.5">Название ачивки</label>
+            <input id="field-title" type="text" required placeholder="Например: Повелитель дедлайнов" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-white/15 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-sky-400 transition-colors" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1.5">Тема</label>
+            <select id="field-theme" required class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-white/15 text-sm text-white focus:outline-none focus:border-sky-400 transition-colors">
+              <option value="IT, Код и Карьера">IT, Код и Карьера</option>
+              <option value="ИТМО и Лабы">ИТМО и Лабы</option>
+              <option value="Железо и Игры">Железо и Игры</option>
+              <option value="Гастрономия и Быт">Гастрономия и Быт</option>
+              <option value="Лоры и Лайфстайл">Лоры и Лайфстайл</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1.5">Редкость</label>
+            <select id="field-rarity" required class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-white/15 text-sm text-white focus:outline-none focus:border-sky-400 transition-colors">
+              <option value="Обычная">Обычная</option>
+              <option value="Редкая">Редкая</option>
+              <option value="Эпическая">Эпическая</option>
+              <option value="Легендарная">Легендарная</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1.5">Описание (за что получена)</label>
+          <textarea id="field-desc" rows="3" required placeholder="Опиши подвиг или локальный мем..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-white/15 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-sky-400 transition-colors resize-none"></textarea>
+        </div>
+
+        <div class="flex items-center justify-end gap-2.5 pt-2">
+          <button type="button" id="form-cancel" class="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-sm font-medium transition-colors">
+            Отмена
+          </button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-400 hover:to-indigo-400 text-white text-sm font-semibold shadow-lg shadow-sky-500/25 transition-all active:scale-95">
+            Сохранить
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Import / Export JSON Modal -->
+  <div id="json-modal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+    <div class="modal-panel glass-strong w-full max-w-xl rounded-3xl p-6 sm:p-7 shadow-2xl">
+      <div class="flex items-center justify-between mb-4">
+        <h2 id="json-modal-title" class="font-display font-bold text-xl text-white">Экспорт / Импорт JSON</h2>
+        <button id="json-close" class="p-2 rounded-xl bg-white/5 hover:bg-white/15 text-slate-400 hover:text-white transition-colors">✕</button>
+      </div>
+      <p id="json-modal-hint" class="text-xs text-slate-400 mb-3"></p>
+      <textarea id="json-textarea" rows="10" class="w-full px-3.5 py-3 rounded-2xl bg-slate-950/90 border border-white/15 font-mono text-xs text-sky-200 focus:outline-none focus:border-sky-400 transition-colors"></textarea>
+
+      <div id="json-export-actions" class="mt-4 flex flex-wrap items-center justify-end gap-2">
+        <button id="btn-copy-json" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-sm font-medium transition-all">
+          📋 Скопировать JSON
+        </button>
+        <button id="btn-download-json" class="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-white text-sm font-semibold transition-all">
+          ⬇️ Скачать achievements.json
+        </button>
+      </div>
+
+      <div id="json-import-actions" class="mt-4 hidden flex-wrap items-center justify-between gap-2">
+        <label class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 text-sm font-medium cursor-pointer transition-all">
+          📁 Выбрать файл .json
+          <input id="json-file-input" type="file" accept=".json,application/json" class="hidden" />
+        </label>
+        <button id="btn-apply-import" class="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-semibold transition-all">
+          ✅ Применить импорт
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Dialog Modal (Replaces native confirm()) -->
+  <div id="confirm-modal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+    <div class="modal-panel glass-strong w-full max-w-sm rounded-3xl p-6 shadow-2xl text-center">
+      <div id="confirm-icon" class="text-4xl mb-3">⚠️</div>
+      <h3 id="confirm-title" class="font-display font-bold text-lg text-white mb-2">Подтверждение</h3>
+      <p id="confirm-message" class="text-sm text-slate-300 mb-6"></p>
+      <div class="flex items-center justify-center gap-2.5">
+        <button id="confirm-cancel" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 text-sm font-medium transition-colors">
+          Отмена
+        </button>
+        <button id="confirm-ok" class="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-white text-sm font-semibold transition-colors">
+          Подтвердить
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 glass-strong px-4 py-2.5 rounded-2xl border border-white/15 shadow-2xl text-sm font-medium text-white flex items-center gap-2 pointer-events-none">
+    <span id="toast-icon">✨</span>
+    <span id="toast-text">Готово</span>
+  </div>
+
+  <script>
+    // =========================================================================
+    // 1. CONFIGURATION: THEMES, RARITIES & DEFAULT ACHIEVEMENTS DATA
+    // =========================================================================
+    const STORAGE_KEY = 'lev_achievements_hall_of_fame_v1';
+
+    const THEMES = {
+      'IT, Код и Карьера': {
+        color: '#38bdf8',
+        hex: 0x38bdf8,
+        emoji: '💻',
+        clusterCenter: { x: -24, y: 10, z: 6 },
+      },
+      'ИТМО и Лабы': {
+        color: '#a855f7',
+        hex: 0xa855f7,
+        emoji: '🎓',
+        clusterCenter: { x: 24, y: 12, z: -4 },
+      },
+      'Железо и Игры': {
+        color: '#10b981',
+        hex: 0x10b981,
+        emoji: '🎮',
+        clusterCenter: { x: 20, y: -14, z: 14 },
+      },
+      'Гастрономия и Быт': {
+        color: '#f59e0b',
+        hex: 0xf59e0b,
+        emoji: '🍫',
+        clusterCenter: { x: -20, y: -15, z: -12 },
+      },
+      'Лоры и Лайфстайл': {
+        color: '#f43f5e',
+        hex: 0xf43f5e,
+        emoji: '🪽',
+        clusterCenter: { x: 0, y: 2, z: -24 },
+      },
+    };
+
+    const RARITIES = {
+      'Обычная': {
+        color: '#94a3b8',
+        badgeClass: 'bg-slate-500/20 text-slate-300 border-slate-400/30',
+        glowClass: '',
+        scale: 0.92,
+      },
+      'Редкая': {
+        color: '#38bdf8',
+        badgeClass: 'bg-sky-500/20 text-sky-300 border-sky-400/40',
+        glowClass: 'rarity-rare-glow',
+        scale: 1.0,
+      },
+      'Эпическая': {
+        color: '#c084fc',
+        badgeClass: 'bg-purple-500/20 text-purple-300 border-purple-400/40',
+        glowClass: 'rarity-epic-glow',
+        scale: 1.1,
+      },
+      'Легендарная': {
+        color: '#facc15',
+        badgeClass: 'bg-amber-400/20 text-amber-300 border-amber-400/50',
+        glowClass: 'rarity-legendary-glow',
+        scale: 1.24,
+      },
+    };
+
+    const DEFAULT_ACHIEVEMENTS = [
+      // IT, Код и Карьера
+      { id: '1', emoji: '✂️', title: 'Сеньор по вырезанию коммитов', rarity: 'Легендарная', theme: 'IT, Код и Карьера', description: 'За беспощадную чистку резюме от «540+ коммитов», «30+ сторов» и онбординга, и праведный гнев, когда нейросеть случайно вырезала Ozon.' },
+      { id: '2', emoji: '🔥', title: 'Кузнец Озона', rarity: 'Эпическая', theme: 'IT, Код и Карьера', description: 'За боевое прошлое на проекте profit-edu-fe (Nuxt 3) и защиту чести бывшего работодателя в резюме.' },
+      { id: '3', emoji: '⚛️', title: 'Мидл на реактивных костылях', rarity: 'Эпическая', theme: 'IT, Код и Карьера', description: 'За подготовку к собесам на Vue 3, Nuxt 3, Pinia и спасение вырезанного React.' },
+      { id: '4', emoji: '🚫', title: 'Убийца кодогенерации', rarity: 'Редкая', theme: 'IT, Код и Карьера', description: 'За категорический запрет упоминать слово «кодогенерация» в резюме. Только хардкор, только руками.' },
+      { id: '5', emoji: '😉', title: 'Интересный человек для интересных вакансий', rarity: 'Легендарная', theme: 'IT, Код и Карьера', description: 'За фирменное сопроводительное в Ростелеком и РТЛабс: «вдруг у вас появятся интересные вакансии для интересного человека ;)».' },
+      { id: '6', emoji: '💌', title: 'Завидный жених для HR-ботов', rarity: 'Редкая', theme: 'IT, Код и Карьера', description: 'За ящик, который разрывается от «Пульса» Сбера, ПСБ, ВК, HireHi и скринингов в Pulsea.' },
+      { id: '7', emoji: '🔓', title: 'Повелитель незакрытых баз данных', rarity: 'Эпическая', theme: 'IT, Код и Карьера', description: 'За игнорирование тревожных писем от Firebase, что WeTogether в Test Mode скоро захлопнется.' },
+      { id: '8', emoji: '📄', title: 'Специалист по укрощению PDF', rarity: 'Редкая', theme: 'IT, Код и Карьера', description: 'За попытки перепридумать UI полноэкранного просмотра документов на pdf.js.' },
+      { id: '9', emoji: '🛒', title: 'Король мультифильтрации (в отставке)', rarity: 'Редкая', theme: 'IT, Код и Карьера', description: 'За интернет-магазин изделий с админкой и калькулятором, из описания которого вылетели «мультифильтрация» и sessionStorage.' },
+      { id: '10', emoji: '🕵️', title: 'Теневой кардинал чатов', rarity: 'Эпическая', theme: 'IT, Код и Карьера', description: 'За план поднять Telegram-юзербота для логирования всех удалённых и отредактированных сообщений.' },
+      { id: '11', emoji: '💼', title: 'Бизнес-аналитик «Френдс Клаба»', rarity: 'Обычная', theme: 'IT, Код и Карьера', description: 'За расчёт сметы и архитектуры кастомного платёжного Telegram-бота.' },
+
+      // ИТМО и Лабы
+      { id: '12', emoji: '📏', title: 'Гроза тире и кавычек-ёлочек', rarity: 'Легендарная', theme: 'ИТМО и Лабы', description: 'За лютую ненависть к нейросетевому стилю в отчётах ИТМО. Никаких длинных тире и воды.' },
+      { id: '13', emoji: '🚀', title: 'Амбассадор «сначала запускаем, потом разбираемся»', rarity: 'Легендарная', theme: 'ИТМО и Лабы', description: 'За поднятие Kubernetes с VictoriaLogs и вопрос за 15 минут до сдачи: «Объясни простыми словами, что я там наворотил».' },
+      { id: '14', emoji: '🖥️', title: 'Хранитель священных ролей FSMO', rarity: 'Эпическая', theme: 'ИТМО и Лабы', description: 'За миграцию контроллеров домена ad-srv и as-srv-2 в Active Directory и проверки через dcdiag и wbadmin.' },
+      { id: '15', emoji: '⚡', title: 'Нагрузочный маньяк', rarity: 'Редкая', theme: 'ИТМО и Лабы', description: 'За прогон Java-кода через JMeter и Gatling и упаковку в Docker-репозиторий itmo-testing-lab3.' },
+      { id: '16', emoji: '🧠', title: 'Укротитель RAGAS и нечёткого поиска', rarity: 'Эпическая', theme: 'ИТМО и Лабы', description: 'За сборку научного RAG-пайплайна в Google Colab с rapidfuzz и OpenAlex.' },
+      { id: '17', emoji: '📊', title: 'Великий комбинатор рекомендаций', rarity: 'Редкая', theme: 'ИТМО и Лабы', description: 'За научную дуэль между MostPop, KNN и коллаборативной фильтрацией с подбором гиперпараметров.' },
+      { id: '18', emoji: '🏛️', title: 'Спринтер Президентской Академии', rarity: 'Редкая', theme: 'ИТМО и Лабы', description: 'За участие в хакатоне «Код прозрачности» от РАНХиГС с дедлайном в 23:59.' },
+      { id: '19', emoji: '🏃', title: 'ИТМОшник-спринтер', rarity: 'Эпическая', theme: 'ИТМО и Лабы', description: 'За совмещение практики с сентября по декабрь, работы, пет-проектов и каток в CS2.' },
+
+      // Железо и Игры
+      { id: '20', emoji: '❄️', title: 'Повелитель башен и термопасты', rarity: 'Легендарная', theme: 'Железо и Игры', description: 'За установку башенного кулера на i5-9400F и ASUS Z370M, чтобы выжать из сборки ещё пару лет жизни.' },
+      { id: '21', emoji: '💾', title: 'Повелитель 120 гигабайт боли', rarity: 'Эпическая', theme: 'Железо и Игры', description: 'За попытку уместить Docker, код и игры на системный SSD объёмом 120 ГБ.' },
+      { id: '22', emoji: '🛍️', title: 'Адепт вечной корзины Ozon', rarity: 'Редкая', theme: 'Железо и Игры', description: 'За SSD Kingston на 1 ТБ, который так долго маринуется в корзине, что Ozon уже умоляет его забрать.' },
+      { id: '23', emoji: '📈', title: 'Спекулянт с торговой площадки', rarity: 'Редкая', theme: 'Железо и Игры', description: 'За регулярные рейды на Steam Market ради скинов и наклеек CS2.' },
+      { id: '24', emoji: '🎮', title: 'Прокси-герой Зеро', rarity: 'Обычная', theme: 'Железо и Игры', description: 'За совмещение потных каток в CS2 и гринда в Zenless Zone Zero.' },
+      { id: '25', emoji: '✨', title: 'Охотник за полихромами', rarity: 'Обычная', theme: 'Железо и Игры', description: 'За предрегистрацию на обнову 3.4 в ZZZ и приглашение на ЗБТ Sea of Remnants.' },
+      { id: '26', emoji: '📍', title: 'Великолукский гость Steam', rarity: 'Редкая', theme: 'Железо и Игры', description: 'За таинственный вход в аккаунт opsigenn через аутентификатор прямиком из Великих Лук.' },
+      { id: '27', emoji: '🃏', title: 'Покерный хайроллер по подписке', rarity: 'Обычная', theme: 'Железо и Игры', description: 'За регулярные приглашения от Эвана Джарвиса выиграть билет за $10,000 на Hustler Casino Live.' },
+
+      // Гастрономия и Быт
+      { id: '28', emoji: '🍫', title: 'Барон глазированных сырков и «Чуда»', rarity: 'Легендарная', theme: 'Гастрономия и Быт', description: 'За железную стабильность в чеках Перекрёстка: сырок «А. Ростагроэкспорт» и коктейль «Чудо», полирнутые Orbit.' },
+      { id: '29', emoji: '🍜', title: 'Гурман двух пакетов за 145 рублей', rarity: 'Эпическая', theme: 'Гастрономия и Быт', description: 'За обед из двух пачек «Бизнес Ланча» с говядиной и возвращение через 3 часа чисто за одним батоном.' },
+      { id: '30', emoji: '🧪', title: 'Алхимик ванильного желатина', rarity: 'Эпическая', theme: 'Гастрономия и Быт', description: 'За чек на 3000₽, где среди тунца и кофе Julius Meinl затесались желатин, ванилин, сгущёнка и сметана.' },
+      { id: '31', emoji: '🥄', title: 'Кулинарный точечник', rarity: 'Редкая', theme: 'Гастрономия и Быт', description: 'За внезапный запрос посреди хардкорного IT: сколько столовых ложек в 200 граммах сахара.' },
+      { id: '32', emoji: '🍕', title: 'Главный по пицце и бонусам', rarity: 'Обычная', theme: 'Гастрономия и Быт', description: 'За регистрацию в гостевом портале «Мама Рома» ради восполнения углеводов после лаб.' },
+      { id: '33', emoji: '📬', title: 'Король непрочитанных', rarity: 'Обычная', theme: 'Гастрономия и Быт', description: 'За сотни нетронутых чеков ОФД и рассылок от Токио-Сити, Funday и Спортмастера.' },
+
+      // Лоры и Лайфстайл
+      { id: '34', emoji: '🪽', title: 'Питерский Тёмный Ангел на минималках', rarity: 'Легендарная', theme: 'Лоры и Лайфстайл', description: 'За телеграм-ник @DarkAngellllllllllllll с превышением нормы букв «l» на душу населения СПб.' },
+      { id: '35', emoji: '😈', title: 'Архитектор рогатых демонесс', rarity: 'Эпическая', theme: 'Лоры и Лайфстайл', description: 'За бесконечные итерации в генерации артов краснокожей Арии и своего крылатого альтер эго.' },
+      { id: '36', emoji: '🎨', title: 'Маэстро AI-косплея', rarity: 'Редкая', theme: 'Лоры и Лайфстайл', description: 'За вживление портрета друга в чужие фотки и фэнтези-арты ради локальных мемов.' },
+      { id: '37', emoji: '💑', title: 'Мастер-фломастер по парным статусам', rarity: 'Эпическая', theme: 'Лоры и Лайфстайл', description: 'За разработку приложения «Мы Вместе» на Firebase, чтобы трекать настроение девушки в реальном времени.' },
+      { id: '38', emoji: '🎲', title: 'Паж за столом с кубами', rarity: 'Редкая', theme: 'Лоры и Лайфстайл', description: 'За верную поддержку девушки-ролевика, пока она спасает миры в D&D.' },
+      { id: '39', emoji: '⚽', title: 'Сине-бело-голубой прогнозист', rarity: 'Обычная', theme: 'Лоры и Лайфстайл', description: 'За верную подписку на рассылки ФК «Зенит» и конкурсы прогнозов.' },
+      { id: '40', emoji: '🐾', title: 'Тайный собачник/кошатник', rarity: 'Обычная', theme: 'Лоры и Лайфстайл', description: 'За регулярные письма от Petshop.ru с призывами порадовать «хвостика».' },
+      { id: '41', emoji: '🏨', title: 'Турист одного дня', rarity: 'Обычная', theme: 'Лоры и Лайфстайл', description: 'За стратегический выезд в апарт-отель YES Хошимина в родном Питере и вылазки в Охта Парк.' },
+      { id: '42', emoji: '🛡️', title: 'Застрахованный на все 365', rarity: 'Обычная', theme: 'Лоры и Лайфстайл', description: 'За годовой туристический полис Ренессанс Страхования для путешествий от кровати до компилятора.' },
+    ];
+
+    // =========================================================================
+    // 2. APPLICATION STATE & STORAGE
+    // =========================================================================
+    let achievements = [];
+    let currentView = '3d'; // '3d' | 'grid'
+    let activeTheme = 'Все';
+    let autoRotate = true;
+    let selectedAchievementId = null;
+
+    function loadAchievements() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            achievements = parsed;
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('Ошибка чтения localStorage:', e);
+      }
+      achievements = JSON.parse(JSON.stringify(DEFAULT_ACHIEVEMENTS));
+      saveAchievements();
+    }
+
+    function saveAchievements() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(achievements));
+      } catch (e) {
+        console.warn('Ошибка сохранения в localStorage:', e);
+      }
+    }
+
+    function getFilteredAchievements() {
+      if (activeTheme === 'Все') return achievements;
+      return achievements.filter((a) => a.theme === activeTheme);
+    }
+
+    // =========================================================================
+    // 3. THREE.JS 3D CONSTELLATION ENGINE
+    // =========================================================================
+    let scene, camera, renderer, controls, raycaster, mouse;
+    let constellationGroup = new THREE.Group();
+    let starfield = null;
+    let nodeMeshes = [];
+    let hoveredMesh = null;
+    let pointerDownPos = { x: 0, y: 0 };
+    let cameraTargetAnim = null;
+
+    function initThree() {
+      const container = document.getElementById('canvas-container');
+      scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x060811, 0.0085);
+
+      camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 400);
+      camera.position.set(0, 14, 62);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      container.appendChild(renderer.domElement);
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.06;
+      controls.rotateSpeed = 0.65;
+      controls.zoomSpeed = 0.9;
+      controls.minDistance = 12;
+      controls.maxDistance = 135;
+      controls.autoRotate = autoRotate;
+      controls.autoRotateSpeed = 0.55;
+
+      raycaster = new THREE.Raycaster();
+      mouse = new THREE.Vector2(-999, -999);
+
+      // Ambient Starfield
+      createStarfield();
+      scene.add(constellationGroup);
+
+      // Events
+      window.addEventListener('resize', onWindowResize);
+      renderer.domElement.addEventListener('pointermove', onPointerMove);
+      renderer.domElement.addEventListener('pointerdown', onPointerDown);
+      renderer.domElement.addEventListener('pointerup', onPointerUp);
+
+      rebuildConstellation();
+      animateThree();
+    }
+
+    function createStarfield() {
+      const starCount = 1400;
+      const geometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(starCount * 3);
+      const colors = new Float32Array(starCount * 3);
+
+      const palette = [
+        new THREE.Color('#38bdf8'),
+        new THREE.Color('#a855f7'),
+        new THREE.Color('#f43f5e'),
+        new THREE.Color('#f8fafc'),
+        new THREE.Color('#facc15'),
+      ];
+
+      for (let i = 0; i < starCount; i++) {
+        const r = 70 + Math.random() * 140;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+
+        positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+        positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+        positions[i * 3 + 2] = r * Math.cos(phi);
+
+        const c = palette[Math.floor(Math.random() * palette.length)];
+        colors[i * 3] = c.r;
+        colors[i * 3 + 1] = c.g;
+        colors[i * 3 + 2] = c.b;
+      }
+
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+      const material = new THREE.PointsMaterial({
+        size: 0.55,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.75,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+
+      starfield = new THREE.Points(geometry, material);
+      scene.add(starfield);
+    }
+
+    // Generate crisp glowing 3D card sprite texture on offscreen Canvas
+    function createCardTexture(ach) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+
+      const themeInfo = THEMES[ach.theme] || THEMES['IT, Код и Карьера'];
+      const rarityInfo = RARITIES[ach.rarity] || RARITIES['Обычная'];
+
+      // Outer radial glow
+      const grad = ctx.createRadialGradient(128, 128, 22, 128, 128, 120);
+      grad.addColorStop(0, themeInfo.color + '66');
+      grad.addColorStop(0.55, themeInfo.color + '1c');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 256, 256);
+
+      // Rounded Glass Card Body
+      const x = 36, y = 36, w = 184, h = 184, r = 34;
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+
+      ctx.fillStyle = 'rgba(11, 16, 32, 0.9)';
+      ctx.fill();
+
+      // Border colored by Rarity / Theme
+      ctx.lineWidth = ach.rarity === 'Легендарная' ? 6 : 4;
+      ctx.strokeStyle = ach.rarity === 'Легендарная' ? '#facc15' : themeInfo.color;
+      ctx.stroke();
+
+      // Inner accent ring for Legendary
+      if (ach.rarity === 'Легендарная') {
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = themeInfo.color;
+        ctx.strokeRect(x + 10, y + 10, w - 20, h - 20);
+      }
+
+      // Emoji
+      ctx.font = '76px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(ach.emoji || '🏆', 128, 110);
+
+      // Short Title inside card
+      ctx.font = '600 18px Inter, sans-serif';
+      ctx.fillStyle = '#f8fafc';
+      const shortTitle = ach.title.length > 15 ? ach.title.slice(0, 14) + '…' : ach.title;
+      ctx.fillText(shortTitle, 128, 178);
+
+      // Rarity dot indicator
+      ctx.beginPath();
+      ctx.arc(128, 202, 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = rarityInfo.color;
+      ctx.fill();
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.needsUpdate = true;
+      return texture;
+    }
+
+    // Deterministic pseudo-random offset based on achievement ID
+    function seededRandom(seedStr) {
+      let h = 2166136261 >>> 0;
+      for (let i = 0; i < seedStr.length; i++) {
+        h ^= seedStr.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return () => {
+        h += 0x6d2b79f5;
+        let t = Math.imul(h ^ (h >>> 15), 1 | h);
+        t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function rebuildConstellation() {
+      // Clear existing children and dispose resources
+      while (constellationGroup.children.length > 0) {
+        const obj = constellationGroup.children[0];
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) {
+          if (obj.material.map) obj.material.map.dispose();
+          obj.material.dispose();
+        }
+        constellationGroup.remove(obj);
+      }
+      nodeMeshes = [];
+      hoveredMesh = null;
+      hideTooltip();
+
+      const list = getFilteredAchievements();
+      const byTheme = {};
+
+      // Position nodes in 3D clusters by theme
+      list.forEach((ach, index) => {
+        const themeInfo = THEMES[ach.theme] || THEMES['IT, Код и Карьера'];
+        const rarityInfo = RARITIES[ach.rarity] || RARITIES['Обычная'];
+        const rand = seededRandom(ach.id + '_' + ach.title);
+
+        if (!byTheme[ach.theme]) byTheme[ach.theme] = [];
+
+        // If filtering a single theme, center it around origin
+        const center = activeTheme === 'Все' ? themeInfo.clusterCenter : { x: 0, y: 0, z: 0 };
+        const spread = activeTheme === 'Все' ? 13 : 20;
+
+        // Fibonacci-like spherical distribution with jitter
+        const angle = index * 2.39996 + rand() * 0.5;
+        const radius = (0.35 + 0.65 * Math.sqrt(rand())) * spread;
+        const yOffset = (rand() - 0.5) * spread * 1.15;
+
+        const pos = new THREE.Vector3(
+          center.x + Math.cos(angle) * radius,
+          center.y + yOffset,
+          center.z + Math.sin(angle) * radius
+        );
+
+        const texture = createCardTexture(ach);
+        const material = new THREE.SpriteMaterial({
+          map: texture,
+          transparent: true,
+          depthWrite: false,
+        });
+
+        const sprite = new THREE.Sprite(material);
+        sprite.position.copy(pos);
+        const baseScale = 4.6 * rarityInfo.scale;
+        sprite.scale.set(baseScale, baseScale, 1);
+
+        sprite.userData = {
+          achievement: ach,
+          baseScale,
+          basePos: pos.clone(),
+          floatPhase: rand() * Math.PI * 2,
+        };
+
+        constellationGroup.add(sprite);
+        nodeMeshes.push(sprite);
+        byTheme[ach.theme].push(sprite);
+      });
+
+      // Create glowing intra-theme constellation links
+      Object.entries(byTheme).forEach(([themeName, sprites]) => {
+        if (sprites.length < 2) return;
+        const themeInfo = THEMES[themeName] || THEMES['IT, Код и Карьера'];
+        const linePositions = [];
+
+        // Connect each node to its 2 nearest neighbors in the same theme
+        sprites.forEach((s1, i) => {
+          const distances = sprites
+            .map((s2, j) => ({ j, dist: i === j ? Infinity : s1.position.distanceTo(s2.position) }))
+            .sort((a, b) => a.dist - b.dist);
+
+          const linksCount = Math.min(2, distances.length);
+          for (let k = 0; k < linksCount; k++) {
+            const target = sprites[distances[k].j];
+            linePositions.push(
+              s1.position.x, s1.position.y, s1.position.z,
+              target.position.x, target.position.y, target.position.z
+            );
+          }
+        });
+
+        const lineGeo = new THREE.BufferGeometry();
+        lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
+        const lineMat = new THREE.LineBasicMaterial({
+          color: themeInfo.hex,
+          transparent: true,
+          opacity: 0.32,
+          blending: THREE.AdditiveBlending,
+        });
+        const lines = new THREE.LineSegments(lineGeo, lineMat);
+        constellationGroup.add(lines);
+      });
+
+      // Create subtle cross-theme hub links when showing All
+      const themeKeys = Object.keys(byTheme);
+      if (activeTheme === 'Все' && themeKeys.length > 1) {
+        const crossPositions = [];
+        for (let i = 0; i < themeKeys.length; i++) {
+          const next = (i + 1) % themeKeys.length;
+          const sA = byTheme[themeKeys[i]][0];
+          const sB = byTheme[themeKeys[next]][0];
+          if (sA && sB) {
+            crossPositions.push(
+              sA.position.x, sA.position.y, sA.position.z,
+              sB.position.x, sB.position.y, sB.position.z
+            );
+          }
+        }
+        const crossGeo = new THREE.BufferGeometry();
+        crossGeo.setAttribute('position', new THREE.Float32BufferAttribute(crossPositions, 3));
+        const crossMat = new THREE.LineBasicMaterial({
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.12,
+          blending: THREE.AdditiveBlending,
+        });
+        constellationGroup.add(new THREE.LineSegments(crossGeo, crossMat));
+      }
+    }
+
+    function onWindowResize() {
+      if (!camera || !renderer) return;
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function onPointerMove(e) {
+      if (currentView !== '3d') return;
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(nodeMeshes, false);
+
+      if (intersects.length > 0) {
+        const hit = intersects[0].object;
+        hoveredMesh = hit;
+        renderer.domElement.style.cursor = 'pointer';
+        showTooltip(hit.userData.achievement, e.clientX, e.clientY);
+      } else {
+        hoveredMesh = null;
+        renderer.domElement.style.cursor = 'grab';
+        hideTooltip();
+      }
+    }
+
+    function onPointerDown(e) {
+      pointerDownPos = { x: e.clientX, y: e.clientY };
+      cameraTargetAnim = null;
+    }
+
+    function onPointerUp(e) {
+      if (currentView !== '3d') return;
+      const dx = e.clientX - pointerDownPos.x;
+      const dy = e.clientY - pointerDownPos.y;
+      // Only trigger click if pointer didn't drag
+      if (Math.hypot(dx, dy) > 6) return;
+
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(nodeMeshes, false);
+
+      if (intersects.length > 0) {
+        const hit = intersects[0].object;
+        focusCameraOnNode(hit.position);
+        openDetailModal(hit.userData.achievement.id);
+      }
+    }
+
+    function focusCameraOnNode(targetPos) {
+      const dir = new THREE.Vector3().subVectors(camera.position, targetPos).normalize();
+      const desiredCamPos = targetPos.clone().add(dir.multiplyScalar(22));
+      cameraTargetAnim = {
+        targetPos: targetPos.clone(),
+        camPos: desiredCamPos,
+        progress: 0,
+      };
+    }
+
+    function resetCamera() {
+      cameraTargetAnim = {
+        targetPos: new THREE.Vector3(0, 0, 0),
+        camPos: new THREE.Vector3(0, 14, 62),
+        progress: 0,
+      };
+    }
+
+    function animateThree() {
+      requestAnimationFrame(animateThree);
+      if (currentView !== '3d') return;
+
+      const time = performance.now() * 0.001;
+
+      if (starfield) {
+        starfield.rotation.y = time * 0.015;
+      }
+
+      // Gentle floating and hover scale animation
+      nodeMeshes.forEach((sprite) => {
+        const { baseScale, basePos, floatPhase } = sprite.userData;
+        sprite.position.y = basePos.y + Math.sin(time * 1.1 + floatPhase) * 0.32;
+
+        const targetScale = sprite === hoveredMesh ? baseScale * 1.28 : baseScale;
+        const currentScale = sprite.scale.x;
+        const nextScale = currentScale + (targetScale - currentScale) * 0.14;
+        sprite.scale.set(nextScale, nextScale, 1);
+      });
+
+      // Smooth camera focus animation
+      if (cameraTargetAnim) {
+        camera.position.lerp(cameraTargetAnim.camPos, 0.07);
+        controls.target.lerp(cameraTargetAnim.targetPos, 0.07);
+        cameraTargetAnim.progress += 0.04;
+        if (cameraTargetAnim.progress >= 1.2) {
+          cameraTargetAnim = null;
+        }
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // =========================================================================
+    // 4. TOOLTIP & UI RENDERING
+    // =========================================================================
+    const tooltipEl = document.getElementById('tooltip-3d');
+
+    function showTooltip(ach, x, y) {
+      const themeInfo = THEMES[ach.theme] || THEMES['IT, Код и Карьера'];
+      const rarityInfo = RARITIES[ach.rarity] || RARITIES['Обычная'];
+
+      document.getElementById('tooltip-emoji').textContent = ach.emoji;
+      document.getElementById('tooltip-title').textContent = ach.title;
+      document.getElementById('tooltip-meta').innerHTML = `
+        <span style="color: ${themeInfo.color}">${ach.theme}</span>
+        <span>•</span>
+        <span style="color: ${rarityInfo.color}">${ach.rarity}</span>
+      `;
+
+      tooltipEl.style.left = `${x}px`;
+      tooltipEl.style.top = `${y}px`;
+      tooltipEl.classList.add('visible');
+    }
+
+    function hideTooltip() {
+      tooltipEl.classList.remove('visible');
+    }
+
+    function renderStats() {
+      document.getElementById('stat-total').textContent = achievements.length;
+      document.getElementById('stat-visible').textContent = getFilteredAchievements().length;
+    }
+
+    function renderThemeFilters() {
+      const container = document.getElementById('theme-filters');
+      const allThemes = ['Все', ...Object.keys(THEMES)];
+
+      container.innerHTML = allThemes
+        .map((theme) => {
+          const isActive = activeTheme === theme;
+          const info = THEMES[theme];
+          const count = theme === 'Все' ? achievements.length : achievements.filter((a) => a.theme === theme).length;
+          const dotColor = info ? info.color : '#f8fafc';
+          const emoji = info ? info.emoji : '✨';
+
+          return `
+            <button
+              data-theme="${theme}"
+              class="theme-pill shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 border ${
+                isActive
+                  ? 'bg-white/15 text-white border-white/30 shadow-lg'
+                  : 'glass text-slate-300 hover:text-white hover:bg-white/10 border-white/10'
+              }"
+            >
+              <span>${emoji}</span>
+              <span>${theme}</span>
+              <span class="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-black/35" style="color: ${dotColor}">${count}</span>
+            </button>
+          `;
+        })
+        .join('');
+
+      container.querySelectorAll('.theme-pill').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          activeTheme = btn.dataset.theme;
+          renderAll();
+          if (currentView === '3d') resetCamera();
+        });
+      });
+    }
+
+    function renderGridView() {
+      const container = document.getElementById('grid-content');
+      const list = getFilteredAchievements();
+
+      if (list.length === 0) {
+        container.innerHTML = `
+          <div class="glass rounded-3xl p-12 text-center">
+            <div class="text-5xl mb-3">🌌</div>
+            <h3 class="font-display font-bold text-xl text-white mb-2">В этой теме пока пусто</h3>
+            <p class="text-sm text-slate-400 mb-5">Добавь новую ачивку, чтобы заполнить Зал Славы.</p>
+            <button onclick="openFormModal()" class="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-white text-sm font-semibold transition-all">
+              + Добавить ачивку
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      // Group by theme
+      const grouped = {};
+      list.forEach((ach) => {
+        if (!grouped[ach.theme]) grouped[ach.theme] = [];
+        grouped[ach.theme].push(ach);
+      });
+
+      let cardIndex = 0;
+      container.innerHTML = Object.entries(grouped)
+        .map(([themeName, items]) => {
+          const themeInfo = THEMES[themeName] || THEMES['IT, Код и Карьера'];
+
+          const cardsHtml = items
+            .map((ach) => {
+              const rarityInfo = RARITIES[ach.rarity] || RARITIES['Обычная'];
+              const delay = Math.min(cardIndex * 35, 600);
+              cardIndex++;
+
+              return `
+                <div
+                  class="tilt-card card-enter glass rounded-2xl p-5 flex flex-col justify-between relative group cursor-pointer ${rarityInfo.glowClass}"
+                  style="animation-delay: ${delay}ms; border-color: ${themeInfo.color}33;"
+                  data-id="${ach.id}"
+                >
+                  <div>
+                    <div class="flex items-start justify-between gap-2 mb-3">
+                      <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-white/5 border border-white/10 shadow-inner">
+                        ${ach.emoji}
+                      </div>
+                      <span class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${rarityInfo.badgeClass}">
+                        ${ach.rarity}
+                      </span>
+                    </div>
+
+                    <h3 class="font-display font-bold text-base text-white leading-snug mb-2 group-hover:text-sky-300 transition-colors">
+                      ${escapeHtml(ach.title)}
+                    </h3>
+                    <p class="text-xs sm:text-sm text-slate-400 leading-relaxed line-clamp-3">
+                      ${escapeHtml(ach.description)}
+                    </p>
+                  </div>
+
+                  <div class="mt-4 pt-3 border-t border-white/10 flex items-center justify-between">
+                    <span class="text-[11px] font-medium" style="color: ${themeInfo.color}">
+                      ● ${themeName}
+                    </span>
+                    <div class="flex items-center gap-1 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        class="btn-card-edit p-1.5 rounded-lg bg-white/10 hover:bg-sky-500/30 text-xs transition-colors"
+                        data-id="${ach.id}"
+                        title="Редактировать"
+                      >✏️</button>
+                      <button
+                        class="btn-card-delete p-1.5 rounded-lg bg-white/10 hover:bg-rose-500/30 text-xs transition-colors"
+                        data-id="${ach.id}"
+                        title="Удалить"
+                      >🗑️</button>
+                    </div>
+                  </div>
+                </div>
+              `;
+            })
+            .join('');
+
+          return `
+            <section>
+              <div class="flex items-center gap-2.5 mb-4">
+                <span class="text-2xl">${themeInfo.emoji}</span>
+                <h2 class="font-display font-bold text-lg sm:text-xl text-white">${themeName}</h2>
+                <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-white/10" style="color: ${themeInfo.color}">
+                  ${items.length}
+                </span>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                ${cardsHtml}
+              </div>
+            </section>
+          `;
+        })
+        .join('');
+
+      // Attach card events & 3D hover tilt
+      container.querySelectorAll('.tilt-card').forEach((card) => {
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('.btn-card-edit') || e.target.closest('.btn-card-delete')) return;
+          openDetailModal(card.dataset.id);
+        });
+
+        card.addEventListener('mousemove', (e) => {
+          const rect = card.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          const rotateY = ((x / rect.width) - 0.5) * 14;
+          const rotateX = ((y / rect.height) - 0.5) * -14;
+          card.style.transform = `perspective(800px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
+        });
+
+        card.addEventListener('mouseleave', () => {
+          card.style.transform = 'perspective(800px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+        });
+      });
+
+      container.querySelectorAll('.btn-card-edit').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openFormModal(btn.dataset.id);
+        });
+      });
+
+      container.querySelectorAll('.btn-card-delete').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          confirmDeleteAchievement(btn.dataset.id);
+        });
+      });
+    }
+
+    function renderAll() {
+      renderStats();
+      renderThemeFilters();
+      if (currentView === 'grid') {
+        renderGridView();
+      }
+      if (scene) {
+        rebuildConstellation();
+      }
+    }
+
+    // =========================================================================
+    // 5. MODALS & CRUD ACTIONS
+    // =========================================================================
+    function openDetailModal(id) {
+      const ach = achievements.find((a) => a.id === id);
+      if (!ach) return;
+      selectedAchievementId = id;
+
+      const themeInfo = THEMES[ach.theme] || THEMES['IT, Код и Карьера'];
+      const rarityInfo = RARITIES[ach.rarity] || RARITIES['Обычная'];
+
+      document.getElementById('detail-emoji-box').textContent = ach.emoji;
+      document.getElementById('detail-title').textContent = ach.title;
+      document.getElementById('detail-desc').textContent = ach.description;
+      document.getElementById('detail-glow').style.backgroundColor = themeInfo.color;
+
+      const themeBadge = document.getElementById('detail-theme-badge');
+      themeBadge.textContent = `${themeInfo.emoji} ${ach.theme}`;
+      themeBadge.style.color = themeInfo.color;
+      themeBadge.style.borderColor = `${themeInfo.color}55`;
+      themeBadge.style.backgroundColor = `${themeInfo.color}1a`;
+
+      const rarityBadge = document.getElementById('detail-rarity-badge');
+      rarityBadge.textContent = ach.rarity;
+      rarityBadge.className = `text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${rarityInfo.badgeClass}`;
+
+      document.getElementById('detail-modal').classList.add('open');
+    }
+
+    function closeDetailModal() {
+      document.getElementById('detail-modal').classList.remove('open');
+    }
+
+    function openFormModal(editId = null) {
+      const form = document.getElementById('achievement-form');
+      form.reset();
+
+      if (editId) {
+        const ach = achievements.find((a) => a.id === editId);
+        if (!ach) return;
+        document.getElementById('form-modal-title').textContent = 'Редактировать ачивку';
+        document.getElementById('field-id').value = ach.id;
+        document.getElementById('field-emoji').value = ach.emoji;
+        document.getElementById('field-title').value = ach.title;
+        document.getElementById('field-theme').value = ach.theme;
+        document.getElementById('field-rarity').value = ach.rarity;
+        document.getElementById('field-desc').value = ach.description;
+      } else {
+        document.getElementById('form-modal-title').textContent = 'Новая ачивка';
+        document.getElementById('field-id').value = '';
+        document.getElementById('field-emoji').value = '🏆';
+        if (activeTheme !== 'Все') {
+          document.getElementById('field-theme').value = activeTheme;
+        }
+      }
+
+      document.getElementById('form-modal').classList.add('open');
+    }
+
+    function closeFormModal() {
+      document.getElementById('form-modal').classList.remove('open');
+    }
+
+    function confirmDeleteAchievement(id) {
+      const ach = achievements.find((a) => a.id === id);
+      if (!ach) return;
+
+      showConfirm({
+        icon: '🗑️',
+        title: 'Удалить ачивку?',
+        message: `Точно удалить «${ach.title}» из Зала Славы?`,
+        onConfirm: () => {
+          achievements = achievements.filter((a) => a.id !== id);
+          saveAchievements();
+          closeDetailModal();
+          renderAll();
+          showToast('Ачивка удалена', '🗑️');
+        },
+      });
+    }
+
+    // Custom confirm modal helper
+    let pendingConfirmCallback = null;
+    function showConfirm({ icon, title, message, onConfirm }) {
+      document.getElementById('confirm-icon').textContent = icon || '⚠️';
+      document.getElementById('confirm-title').textContent = title;
+      document.getElementById('confirm-message').textContent = message;
+      pendingConfirmCallback = onConfirm;
+      document.getElementById('confirm-modal').classList.add('open');
+    }
+
+    function closeConfirm() {
+      document.getElementById('confirm-modal').classList.remove('open');
+      pendingConfirmCallback = null;
+    }
+
+    // Export / Import JSON Modal
+    function openJsonModal(mode) {
+      const textarea = document.getElementById('json-textarea');
+      const exportActions = document.getElementById('json-export-actions');
+      const importActions = document.getElementById('json-import-actions');
+
+      if (mode === 'export') {
+        document.getElementById('json-modal-title').textContent = 'Экспорт ачивок (JSON)';
+        document.getElementById('json-modal-hint').textContent = 'Скопируй этот JSON или скачай файл — его можно скинуть ИИ для быстрого редактирования и добавления новых ачивок.';
+        textarea.value = JSON.stringify(achievements, null, 2);
+        textarea.readOnly = true;
+        exportActions.classList.remove('hidden');
+        exportActions.classList.add('flex');
+        importActions.classList.add('hidden');
+        importActions.classList.remove('flex');
+      } else {
+        document.getElementById('json-modal-title').textContent = 'Импорт ачивок (JSON)';
+        document.getElementById('json-modal-hint').textContent = 'Вставь JSON-массив ачивок ниже или загрузи файл achievements.json.';
+        textarea.value = '';
+        textarea.readOnly = false;
+        exportActions.classList.add('hidden');
+        exportActions.classList.remove('flex');
+        importActions.classList.remove('hidden');
+        importActions.classList.add('flex');
+      }
+
+      document.getElementById('json-modal').classList.add('open');
+    }
+
+    function closeJsonModal() {
+      document.getElementById('json-modal').classList.remove('open');
+    }
+
+    // Toast notification
+    let toastTimer = null;
+    function showToast(text, icon = '✨') {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-text').textContent = text;
+      document.getElementById('toast-icon').textContent = icon;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // =========================================================================
+    // 6. EVENT LISTENERS & INITIALIZATION
+    // =========================================================================
+    function switchView(view) {
+      currentView = view;
+      const btn3d = document.getElementById('btn-view-3d');
+      const btnGrid = document.getElementById('btn-view-grid');
+      const canvasContainer = document.getElementById('canvas-container');
+      const gridView = document.getElementById('grid-view');
+      const controlsBar = document.getElementById('controls-3d-bar');
+      const hint3d = document.getElementById('hint-3d');
+
+      if (view === '3d') {
+        btn3d.className = 'px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all flex items-center gap-1.5 bg-sky-500/20 text-sky-300 border border-sky-400/30 shadow-sm';
+        btnGrid.className = 'px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all flex items-center gap-1.5 text-slate-400 hover:text-white border border-transparent';
+        canvasContainer.style.display = 'block';
+        gridView.classList.add('hidden');
+        controlsBar.classList.remove('hidden');
+        hint3d.classList.remove('hidden');
+        onWindowResize();
+      } else {
+        btnGrid.className = 'px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all flex items-center gap-1.5 bg-sky-500/20 text-sky-300 border border-sky-400/30 shadow-sm';
+        btn3d.className = 'px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all flex items-center gap-1.5 text-slate-400 hover:text-white border border-transparent';
+        canvasContainer.style.display = 'none';
+        gridView.classList.remove('hidden');
+        controlsBar.classList.add('hidden');
+        hint3d.classList.add('hidden');
+        hideTooltip();
+        renderGridView();
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadAchievements();
+      initThree();
+      renderAll();
+
+      // View switcher
+      document.getElementById('btn-view-3d').addEventListener('click', () => switchView('3d'));
+      document.getElementById('btn-view-grid').addEventListener('click', () => switchView('grid'));
+
+      // 3D Controls
+      document.getElementById('btn-autorotate').addEventListener('click', () => {
+        autoRotate = !autoRotate;
+        controls.autoRotate = autoRotate;
+        document.getElementById('autorotate-label').textContent = `Автовращение: ${autoRotate ? 'ВКЛ' : 'ВЫКЛ'}`;
+      });
+      document.getElementById('btn-reset-cam').addEventListener('click', resetCamera);
+
+      // Top actions
+      document.getElementById('btn-add').addEventListener('click', () => openFormModal());
+      document.getElementById('btn-export').addEventListener('click', () => openJsonModal('export'));
+      document.getElementById('btn-import').addEventListener('click', () => openJsonModal('import'));
+      document.getElementById('btn-reset').addEventListener('click', () => {
+        showConfirm({
+          icon: '🔄',
+          title: 'Сбросить все ачивки?',
+          message: 'Все твои правки будут заменены исходным списком из 42 ачивок.',
+          onConfirm: () => {
+            achievements = JSON.parse(JSON.stringify(DEFAULT_ACHIEVEMENTS));
+            activeTheme = 'Все';
+            saveAchievements();
+            renderAll();
+            showToast('Список сброшен к стандартному', '🔄');
+          },
+        });
+      });
+
+      // Detail modal buttons
+      document.getElementById('detail-close').addEventListener('click', closeDetailModal);
+      document.getElementById('detail-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'detail-modal') closeDetailModal();
+      });
+      document.getElementById('detail-edit').addEventListener('click', () => {
+        closeDetailModal();
+        openFormModal(selectedAchievementId);
+      });
+      document.getElementById('detail-delete').addEventListener('click', () => {
+        confirmDeleteAchievement(selectedAchievementId);
+      });
+
+      // Form modal buttons
+      document.getElementById('form-close').addEventListener('click', closeFormModal);
+      document.getElementById('form-cancel').addEventListener('click', closeFormModal);
+      document.getElementById('form-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'form-modal') closeFormModal();
+      });
+
+      document.getElementById('achievement-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const id = document.getElementById('field-id').value;
+        const payload = {
+          id: id || String(Date.now()),
+          emoji: document.getElementById('field-emoji').value.trim() || '🏆',
+          title: document.getElementById('field-title').value.trim(),
+          theme: document.getElementById('field-theme').value,
+          rarity: document.getElementById('field-rarity').value,
+          description: document.getElementById('field-desc').value.trim(),
+        };
+
+        if (id) {
+          const idx = achievements.findIndex((a) => a.id === id);
+          if (idx !== -1) achievements[idx] = payload;
+          showToast('Ачивка обновлена!', '✏️');
+        } else {
+          achievements.unshift(payload);
+          showToast('Ачивка добавлена в созвездие!', '🎉');
+        }
+
+        saveAchievements();
+        closeFormModal();
+        renderAll();
+      });
+
+      // JSON modal buttons
+      document.getElementById('json-close').addEventListener('click', closeJsonModal);
+      document.getElementById('json-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'json-modal') closeJsonModal();
+      });
+
+      document.getElementById('btn-copy-json').addEventListener('click', () => {
+        const textarea = document.getElementById('json-textarea');
+        textarea.select();
+        document.execCommand('copy');
+        showToast('JSON скопирован в буфер!', '📋');
+      });
+
+      document.getElementById('btn-download-json').addEventListener('click', () => {
+        const blob = new Blob([JSON.stringify(achievements, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'achievements.json';
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('Файл achievements.json скачан', '⬇️');
+      });
+
+      document.getElementById('json-file-input').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          document.getElementById('json-textarea').value = ev.target.result;
+        };
+        reader.readAsText(file);
+      });
+
+      document.getElementById('btn-apply-import').addEventListener('click', () => {
+        try {
+          const parsed = JSON.parse(document.getElementById('json-textarea').value);
+          if (!Array.isArray(parsed)) throw new Error('Ожидается JSON-массив');
+          const valid = parsed.filter((a) => a && a.title && a.description).map((a, i) => ({
+            id: a.id ? String(a.id) : String(Date.now() + i),
+            emoji: a.emoji || '🏆',
+            title: String(a.title),
+            theme: THEMES[a.theme] ? a.theme : 'IT, Код и Карьера',
+            rarity: RARITIES[a.rarity] ? a.rarity : 'Обычная',
+            description: String(a.description),
+          }));
+          if (valid.length === 0) throw new Error('Не найдено валидных ачивок');
+
+          achievements = valid;
+          saveAchievements();
+          closeJsonModal();
+          renderAll();
+          showToast(`Импортировано ачивок: ${valid.length}`, '✅');
+        } catch (err) {
+          showToast('Ошибка JSON: ' + err.message, '❌');
+        }
+      });
+
+      // Confirm modal buttons
+      document.getElementById('confirm-cancel').addEventListener('click', closeConfirm);
+      document.getElementById('confirm-ok').addEventListener('click', () => {
+        if (pendingConfirmCallback) pendingConfirmCallback();
+        closeConfirm();
+      });
+    });
+  </script>
+</body>
+</html>
